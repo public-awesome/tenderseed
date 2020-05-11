@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/subcommands"
 	"github.com/tendermint/tendermint/config"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
+	cmn "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/p2p/pex"
 	"github.com/tendermint/tendermint/version"
@@ -97,7 +97,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 
 	nodeInfo := p2p.DefaultNodeInfo{
 		ProtocolVersion: protocolVersion,
-		ID_:             nodeKey.ID(),
+		DefaultNodeID:   nodeKey.ID(),
 		ListenAddr:      args.SeedConfig.ListenAddress,
 		Network:         chainID,
 		Version:         "0.0.1",
@@ -105,7 +105,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 		Moniker:         fmt.Sprintf("%s-seed", chainID),
 	}
 
-	addr, err := p2p.NewNetAddressString(p2p.IDAddressString(nodeInfo.ID_, nodeInfo.ListenAddr))
+	addr, err := p2p.NewNetAddressString(p2p.IDAddressString(nodeInfo.DefaultNodeID, nodeInfo.ListenAddr))
 	if err != nil {
 		panic(err)
 	}
@@ -118,7 +118,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 	book := pex.NewAddrBook(addrBookFilePath, args.SeedConfig.AddrBookStrict)
 	book.SetLogger(filteredLogger.With("module", "book"))
 
-	pexReactor := pex.NewPEXReactor(book, &pex.PEXReactorConfig{
+	pexReactor := pex.NewReactor(book, &pex.ReactorConfig{
 		SeedMode: true,
 		// TODO(roman) see SeedConfig.Seeds field comment for blocker
 		// Seeds:    args.SeedConfig.Seeds,
