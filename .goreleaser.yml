@@ -27,6 +27,16 @@ release:
   prerelease: auto
   draft: false
 
+nfpms:
+  -
+    vendor: Overclock Labs Inc.
+    homepage: http://github.com/ovrclk/tenderseed
+    maintainer: Adam Bozanich <adam@akash.network>
+    formats:
+      - deb
+      - rpm
+    license: Apache 2.0
+
 checksum:
   name_template: 'checksums.txt'
 snapshot:
