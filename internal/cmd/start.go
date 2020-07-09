@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"tenderseed/internal/tenderseed"
 
 	"github.com/google/subcommands"
 	"github.com/tendermint/tendermint/config"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
+	tmos "github.com/tendermint/tendermint/libs/os"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/p2p/pex"
 	"github.com/tendermint/tendermint/version"
@@ -71,6 +72,9 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 	// keep trying to make outbound connections to exchange peering info
 	cfg.MaxNumOutboundPeers = args.SeedConfig.MaxNumOutboundPeers
 
+	// connect to initial peers.
+	cfg.Seeds = args.SeedConfig.Seeds
+
 	nodeKey, err := p2p.LoadOrGenNodeKey(nodeKeyFilePath)
 	if err != nil {
 		panic(err)
@@ -97,7 +101,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 
 	nodeInfo := p2p.DefaultNodeInfo{
 		ProtocolVersion: protocolVersion,
-		ID_:             nodeKey.ID(),
+		DefaultNodeID:   nodeKey.ID(),
 		ListenAddr:      args.SeedConfig.ListenAddress,
 		Network:         chainID,
 		Version:         "0.0.1",
@@ -105,7 +109,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 		Moniker:         fmt.Sprintf("%s-seed", chainID),
 	}
 
-	addr, err := p2p.NewNetAddressString(p2p.IDAddressString(nodeInfo.ID_, nodeInfo.ListenAddr))
+	addr, err := p2p.NewNetAddressString(p2p.IDAddressString(nodeInfo.DefaultNodeID, nodeInfo.ListenAddr))
 	if err != nil {
 		panic(err)
 	}
@@ -118,10 +122,9 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 	book := pex.NewAddrBook(addrBookFilePath, args.SeedConfig.AddrBookStrict)
 	book.SetLogger(filteredLogger.With("module", "book"))
 
-	pexReactor := pex.NewPEXReactor(book, &pex.PEXReactorConfig{
+	pexReactor := pex.NewReactor(book, &pex.ReactorConfig{
 		SeedMode: true,
-		// TODO(roman) see SeedConfig.Seeds field comment for blocker
-		// Seeds:    args.SeedConfig.Seeds,
+		Seeds:    splitAndTrimEmpty(args.SeedConfig.Seeds, ",", " "),
 	})
 	pexReactor.SetLogger(filteredLogger.With("module", "pex"))
 
@@ -134,7 +137,7 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 	// last
 	sw.SetNodeInfo(nodeInfo)
 
-	cmn.TrapSignal(logger, func() {
+	tmos.TrapSignal(logger, func() {
 		logger.Info("shutting down...")
 		book.Save()
 		err := sw.Stop()
@@ -150,4 +153,27 @@ func (args *StartArgs) Execute(_ context.Context, flagSet *flag.FlagSet, _ ...in
 
 	sw.Wait()
 	return subcommands.ExitSuccess
+}
+
+// splitAndTrimEmpty slices s into all subslices separated by sep and returns a
+// slice of the string s with all leading and trailing Unicode code points
+// contained in cutset removed. If sep is empty, SplitAndTrim splits after each
+// UTF-8 sequence. First part is equivalent to strings.SplitN with a count of
+// -1.  also filter out empty strings, only return non-empty strings.
+//
+// shamelessly lifted from: https://github.com/tendermint/tendermint/blob/606d0a89ccabbd3e59cff521f9f4d875cc366ac9/node/node.go#L1230-L1249
+func splitAndTrimEmpty(s, sep, cutset string) []string {
+	if s == "" {
+		return []string{}
+	}
+
+	spl := strings.Split(s, sep)
+	nonEmptyStrings := make([]string, 0, len(spl))
+	for i := 0; i < len(spl); i++ {
+		element := strings.Trim(spl[i], cutset)
+		if element != "" {
+			nonEmptyStrings = append(nonEmptyStrings, element)
+		}
+	}
+	return nonEmptyStrings
 }
