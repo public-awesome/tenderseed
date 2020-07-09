@@ -16,7 +16,7 @@ jobs:
       - name: release dry-run
         uses: goreleaser/goreleaser-action@v1
         with:
-          args: --skip-validate --skip-publish
+          args: --skip-validate --skip-publish --snapshot
           version: v0.139.0
 
       - if: github.ref != 'refs/heads/master'
