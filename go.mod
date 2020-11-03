@@ -1,6 +1,6 @@
 module tenderseed
 
-go 1.14
+go 1.15
 
 require (
 	github.com/google/subcommands v1.0.1

@@ -1,0 +1,39 @@
+---
+    kind: pipeline
+    type: docker
+    name: default
+    steps:
+      - name: build
+        image: golang:1.15.3
+        commands:
+          - apt-get update && apt-get install cmake -y
+          - make build-linux
+        environment:
+          GOPROXY: http://goproxy
+      - name: publish-docker
+        image: plugins/docker:18
+        settings:
+          dockerfile: Dockerfile
+          repo: publicawesome/tenderseed
+          username:
+            from_secret: docker_username
+          password:
+            from_secret: docker_password
+        when:
+          branch: stargate
+          event:
+            - push
+      - name: discord
+        image: appleboy/drone-discord
+        settings:
+          webhook_id: 
+            from_secret: discord_webhook_id
+          webhook_token: 
+            from_secret: discord_webhook_token
+        when:
+          status: [success, failure]
+---
+kind: signature
+hmac: 50b8241a703a7084ff25645a94a25d983ea3e943656521b3008425a4d192d7c5
+
+...
